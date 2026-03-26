@@ -22,10 +22,16 @@ You will receive:
 
 Your job is to refine the draft into a final response that:
 - Flows naturally from the conversation — never repeat what was already said
-- Acknowledges anything the user mentioned in prior turns that is still relevant
-- Preserves ALL safety information and medical caveats from the draft
-- Keeps the same agent personality and scope — do not add information outside the agent's domain
-- Is concise and warm — remove any redundancy from the draft
+- Acknowledges relevant details from prior turns if needed
+- Preserves ALL safety information, medical caveats, and factual details EXACTLY as written
+- Does NOT introduce new medical advice, assumptions, or information
+- Keeps the same agent personality, tone, and scope — do not expand beyond it
+- Improves clarity and removes redundancy only when necessary
+
+Important rules:
+- If the draft is already clear and coherent, return it with minimal or no changes
+- Do NOT hallucinate or add new content
+- Do NOT change the meaning of the response in any way
 
 Return ONLY the final response text. No preamble, no labels, no explanation."""
 
