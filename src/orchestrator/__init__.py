@@ -1,3 +1,4 @@
 from src.orchestrator.orchestrator import Orchestrator
+from src.orchestrator.synthesizer import ResponseSynthesizer
 
-__all__ = ["Orchestrator"]
+__all__ = ["Orchestrator", "ResponseSynthesizer"]
