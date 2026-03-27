@@ -1,16 +1,17 @@
 import json
+import logging
 import re
+from pathlib import Path
 
 import litellm
 
 from src.config import MODEL_NAME, TEMPERATURE
 from src.models.schemas import AgentType, ConversationContext, RouterDecision
-from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 
 class RouterAgent:
-    """Classifies user intent and returns a routing decision."""
-
     def __init__(self) -> None:
         prompt_path = Path(__file__).parent.parent.parent / "prompts" / "router.md"
         self.system_prompt = prompt_path.read_text(encoding="utf-8").strip()
@@ -23,27 +24,68 @@ class RouterAgent:
             *context.get_history_for_prompt()[-4:],
             {"role": "user", "content": user_text},
         ]
-        response = litellm.completion(
-            model=MODEL_NAME,
-            messages=messages,
-            max_tokens=256,
-            temperature=TEMPERATURE,
-        )
-        raw = response.choices[0].message.content.strip()
+
+        try:
+            for attempt in range(3):
+                try:
+                    response = litellm.completion(
+                        model=MODEL_NAME,
+                        messages=messages,
+                        max_tokens=256,
+                        temperature=TEMPERATURE,
+                    )
+                    raw = response.choices[0].message.content.strip()
+                    logger.info("Router raw LLM response: %s", raw)
+                    break
+                except Exception as e:
+                    if ("429" in str(e) or "rate" in str(e).lower()) and attempt < 2:
+                        import time
+                        time.sleep(15 * (attempt + 1))
+                    else:
+                        raise
+        except Exception as e:
+            return RouterDecision(
+                target_agents=[AgentType.FALLBACK],
+                reasoning=f"LLM call failed: {e}",
+                confidence=0.0,
+            )
+
         return self._parse_decision(raw)
 
     def _parse_decision(self, raw: str) -> RouterDecision:
         try:
             cleaned = re.sub(r"```(?:json)?|```", "", raw).strip()
-            data = json.loads(cleaned)
+            match = re.search(r"\{.*\}", cleaned, re.DOTALL)
+            if not match:
+                raise ValueError("No JSON object found")
+
+            data = json.loads(match.group())
+            raw_agents = data.get("target_agents") or data.get("target_agent")
+
+            if isinstance(raw_agents, str):
+                raw_agents = [raw_agents]
+            elif not isinstance(raw_agents, list):
+                raw_agents = ["fallback"]
+
+            target_agents = []
+            for a in raw_agents:
+                try:
+                    target_agents.append(AgentType(str(a).strip().lower()))
+                except ValueError:
+                    target_agents.append(AgentType.FALLBACK)
+
+            if not target_agents:
+                target_agents = [AgentType.FALLBACK]
+
             return RouterDecision(
-                target_agent=AgentType(data["target_agent"]),
-                reasoning=data.get("reasoning", ""),
+                target_agents=target_agents,
+                reasoning=str(data.get("reasoning", "")),
                 confidence=float(data.get("confidence", 0.8)),
             )
-        except Exception:
+
+        except Exception as e:
             return RouterDecision(
-                target_agent=AgentType.FALLBACK,
-                reasoning="Could not parse router response",
+                target_agents=[AgentType.FALLBACK],
+                reasoning=f"Parse failed: {e}",
                 confidence=0.0,
             )

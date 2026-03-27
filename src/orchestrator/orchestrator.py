@@ -1,4 +1,6 @@
 import logging
+from typing import Dict
+
 from src.agents.base_agent import BaseAgent
 from src.agents.lifestyle_agent import LifestyleAgent
 from src.agents.medication_agent import MedicationAgent
@@ -23,31 +25,46 @@ FALLBACK_RESPONSE = (
     "emergency services immediately."
 )
 
+# Configurable thresholds
+MIN_CONFIDENCE_THRESHOLD = 0.6
+MAX_CONTEXT_MESSAGES = 12
+
 
 class Orchestrator:
     """
     Central coordinator. Receives a user message, asks the router which
     specialist should handle it, delegates to that agent, synthesizes
     the response with conversation context, and returns the final reply.
+
     Supports multiple independent sessions simultaneously.
     """
 
     def __init__(self) -> None:
         self.router = RouterAgent()
         self.synthesizer = ResponseSynthesizer()
-        self._agents: dict[AgentType, BaseAgent] = {
+
+        self._agents: Dict[AgentType, BaseAgent] = {
             AgentType.SYMPTOM: SymptomAgent(),
             AgentType.MEDICATION: MedicationAgent(),
             AgentType.LIFESTYLE: LifestyleAgent(),
         }
-        self._contexts: dict[str, ConversationContext] = {}
 
+        self._contexts: Dict[str, ConversationContext] = {}
+
+    # -------------------------
+    # Context Management
+    # -------------------------
     def _get_context(self, session_id: str) -> ConversationContext:
         """Returns existing context for session or creates a new one."""
         if session_id not in self._contexts:
             self._contexts[session_id] = ConversationContext(session_id=session_id)
             logger.info("New session created: %s", session_id)
         return self._contexts[session_id]
+
+    def _trim_context(self, context: ConversationContext) -> None:
+        """Prevent unbounded growth — trims to MAX_CONTEXT_MESSAGES."""
+        if len(context.history) > MAX_CONTEXT_MESSAGES:
+            context.history = context.history[-MAX_CONTEXT_MESSAGES:]
 
     def get_all_sessions(self) -> list[str]:
         """Returns all active session IDs."""
@@ -59,6 +76,9 @@ class Orchestrator:
             del self._contexts[session_id]
             logger.info("Session cleared: %s", session_id)
 
+    # -------------------------
+    # Fallback Handling
+    # -------------------------
     def _handle_fallback(self) -> AgentResponse:
         return AgentResponse(
             agent=AgentType.FALLBACK,
@@ -66,41 +86,87 @@ class Orchestrator:
             routed_by=AgentType.ROUTER,
         )
 
+    # -------------------------
+    # Main Processing Pipeline
+    # -------------------------
     def process(self, user_message: UserMessage) -> AgentResponse:
         context = self._get_context(user_message.session_id)
 
+        # Add user message
         context.add_user_message(user_message.text)
 
-        decision: RouterDecision = self.router.decide(user_message.text, context)
+        # Trim context to avoid token explosion
+        self._trim_context(context)
+
+        # Step 1: Routing
+        try:
+            decision: RouterDecision = self.router.decide(user_message.text, context)
+        except Exception:
+            logger.exception("Router failed")
+            return self._handle_fallback()
 
         logger.info(
-            "Router decision: session=%s agent=%s confidence=%.2f reasoning=%s",
+            "Router decision: session=%s agents=%s confidence=%.2f reasoning=%s",
             user_message.session_id,
-            decision.target_agent,
+            [a.value for a in decision.target_agents],
             decision.confidence,
             decision.reasoning,
         )
 
-        if decision.target_agent == AgentType.FALLBACK:
-            response = self._handle_fallback()
-        else:
-            agent = self._agents[decision.target_agent]
-            raw_response = agent.respond(user_message.text, context)
-
-            logger.info(
-                "Synthesizing response for session=%s agent=%s",
+        # Step 2: Confidence gating
+        if decision.confidence < MIN_CONFIDENCE_THRESHOLD:
+            logger.warning(
+                "Low confidence routing: session=%s confidence=%.2f",
                 user_message.session_id,
-                raw_response.agent,
+                decision.confidence,
             )
-            response = self.synthesizer.synthesize(raw_response, context)
+            return self._handle_fallback()
 
-        if response.should_escalate:
+        # Step 3: Agent execution — fan out to all target agents
+        try:
+            # Filter out fallback early
+            agents_to_run = [
+                a for a in decision.target_agents
+                if a != AgentType.FALLBACK and a in self._agents
+            ]
+
+            if not agents_to_run:
+                response = self._handle_fallback()
+            else:
+                raw_responses = []
+                for agent_type in agents_to_run:
+                    agent = self._agents[agent_type]
+                    raw = agent.respond(user_message.text, context)
+                    raw_responses.append(raw)
+                    logger.info(
+                        "Agent responded: session=%s agent=%s",
+                        user_message.session_id,
+                        agent_type.value,
+                    )
+
+                # Step 4: Merge all responses via synthesizer
+                response = self.synthesizer.merge(raw_responses, context)
+
+        except Exception:
+            logger.exception(
+                "Agent execution failed: session=%s agents=%s",
+                user_message.session_id,
+                [a.value for a in decision.target_agents],
+            )
+            return self._handle_fallback()
+
+        # Step 5: Escalation logging
+        if getattr(response, "should_escalate", False):
             logger.warning(
                 "ESCALATION flagged: session=%s text=%s",
                 user_message.session_id,
                 user_message.text[:80],
             )
 
-        context.add_agent_response(response)
+        # Step 6: Persist response in context
+        try:
+            context.add_agent_response(response)
+        except Exception:
+            logger.warning("Failed to store agent response", exc_info=True)
 
         return response

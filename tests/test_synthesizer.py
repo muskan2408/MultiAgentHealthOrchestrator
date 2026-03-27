@@ -86,3 +86,27 @@ class TestResponseSynthesizer:
         raw = AgentResponse(agent=AgentType.SYMPTOM, text="Raw.", routed_by=AgentType.ROUTER)
         result = synth.synthesize(raw, ctx)
         assert result.routed_by == AgentType.ROUTER
+
+    @patch("src.orchestrator.synthesizer.litellm.completion")
+    def test_merge_multiple_agents(self, mock_llm):
+        mock_llm.return_value = MagicMock(
+            choices=[MagicMock(message=MagicMock(content="Merged answer."))]
+        )
+        synth = ResponseSynthesizer()
+        ctx = ConversationContext(session_id="t")
+        ctx.add_user_message("I feel sick after taking ibuprofen")
+        responses = [
+            AgentResponse(agent=AgentType.SYMPTOM, text="Symptom draft.", should_escalate=True),
+            AgentResponse(agent=AgentType.MEDICATION, text="Medication draft.", confidence=0.8),
+        ]
+        result = synth.merge(responses, ctx)
+        assert result.agent == AgentType.SYNTHESIZER
+        assert result.text == "Merged answer."
+        assert result.should_escalate is True
+        assert result.confidence == 0.8
+
+    def test_merge_empty_responses(self):
+        synth = ResponseSynthesizer()
+        ctx = ConversationContext(session_id="t")
+        result = synth.merge([], ctx)
+        assert result.agent == AgentType.FALLBACK
