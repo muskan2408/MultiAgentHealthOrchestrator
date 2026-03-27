@@ -425,3 +425,12 @@ HealthBot/
 - **Multi-Session Support** — the web UI supports multiple concurrent conversations with isolated context
 - **Rate Limit Resilience** — automatic retry with exponential backoff on 429 errors (free-tier Gemini has 5 req/min)
 - **Observability** — structured logging throughout the orchestrator (routing decisions, agent responses, escalation warnings)
+
+## Web UI - How it looks for now
+<img width="1453" height="788" alt="Screenshot 2026-03-27 at 12 35 48" src="https://github.com/user-attachments/assets/99cb5eb9-9ba8-4a31-8f30-<img width="1465" height="760" alt="Screenshot 2026-03-27 at 12 38 14" src="https://github.com/user-attachments/assets/09a91ca4-fe0f-42ab-886f-ed0f8c7352c4" />
+<img width="1465" height="760" alt="Screenshot 2026-03-27 at 12 38 14" src="https://github.com/user-attachments/assets/09a91ca4-fe0f-42ab-886f-ed0f8c7352c4" />
+50d80bcadd9b" />
+<img width="1453" height="788" alt="Screenshot 2026-03-27 at 12 35 48" src="https://github.com/user-attachments/assets/99cb5eb9-9ba8-4a31-8f30-50d80bcadd9b" />
+
+
+
