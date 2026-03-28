@@ -8,7 +8,6 @@ from src.models.schemas import AgentType, ConversationContext, RouterDecision
 
 logger = logging.getLogger(__name__)
 
-
 class RouterAgent:
     def __init__(self) -> None:
         prompt_path = Path(__file__).parent.parent.parent / "prompts" / "router.md"

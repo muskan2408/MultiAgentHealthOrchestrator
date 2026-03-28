@@ -398,9 +398,7 @@ class ChatHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(json.dumps(payload).encode("utf-8"))
 
-
-if __name__ == "__main__":
-    port = 8000
+def run_server(port: int = 8000) -> None:
     print(f"\n  mama health is running at http://localhost:{port}")
     print("  Open that URL in your browser.")
     print("  Press Ctrl+C to stop.\n")
@@ -409,3 +407,4 @@ if __name__ == "__main__":
         server.serve_forever()
     except KeyboardInterrupt:
         print("\n  Server stopped.")
+

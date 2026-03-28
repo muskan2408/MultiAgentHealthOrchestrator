@@ -275,18 +275,18 @@ Create a `.env` file in the project root:
 GEMINI_API_KEY=your_api_key_here
 ```
 
-### Running
+### Usage
 
 **CLI mode:**
 ```bash
-python -m src.main
+python app.py cli ## add -v for verbose logging 
 ```
 
 **Web UI:**
 ```bash
-python -m src.web
+python app.py web
 # Open http://localhost:8000
-```
+``` 
 
 ### Testing
 
@@ -321,7 +321,7 @@ MamaHealthAgent/
 │   │   └── client.py           # Thin LiteLLM wrapper — retries, config, single call point
 │   ├── models/
 │   │   └── schemas.py          # Pydantic models (AgentType, Message, etc.)
-│   └── main.py                 # CLI entry point (--verbose flag for logging)
+│   └── cli.py                  # CLI entry point (--verbose flag for logging)
 │   └── web.py                  # Web entry point
 ├── prompts/
 │   ├── router.md               # Router classification prompt
@@ -337,6 +337,7 @@ MamaHealthAgent/
 │   ├── test_context.py         # ConversationContext memory tests (8 tests)
 │   └── test_synthesizer.py     # Synthesizer merge + fallback tests (8 tests)
 ├── requirements.txt
+├── app.py                      # Entry Point for App
 ├── README.md                   # This file
 └── README1.md                  # Original challenge brief
 ```
