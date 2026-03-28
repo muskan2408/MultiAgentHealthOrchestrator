@@ -1,9 +1,21 @@
 # mama health — Multi-Agent Health Assistant
 
-A multi-agent orchestration system where a central router delegates user queries to one or more specialized health agents. Built with Python, LiteLLM (Gemini), and Pydantic.
+A multi-agent orchestration system where a central router delegates user queries to one or more specialized health agents. Built with `Python`, `LiteLLM (Gemini)`, and `Pydantic`.
 
 > The original challenge brief is preserved in [README1.md](README1.md).
 
+##### Table of Contents
+- [Architecture Overview](#architecture-overview)
+- [Key Design Decisions](#key-design-decisions)
+- [Prompt Design Decisions](#prompt-design-decisions)
+- [Example Conversations](#example-conversations)
+- [Setup Instructions](#setup-instructions)
+- [Appendix](#appendix)
+  - [Project Structure](#project-structure)
+  - [Test Coverage Summary](#test-coverage-summary)
+  - [Optional Features Implemented](#optional-features-implemented)
+  - [Why merge() vs synthesize()](#why-merge-vs-synthesize)
+  - [Web UI](#web-ui)
 ---
 
 ## Architecture Overview
@@ -11,7 +23,7 @@ A multi-agent orchestration system where a central router delegates user queries
 ```
 ┌─────────────────────────────────────────────────────────┐
 │                      User Input                         │
-│              (CLI or Web Chat UI)                        │
+│              (CLI or Web Chat UI)                       │
 └──────────────────────┬──────────────────────────────────┘
                        │
                        ▼
@@ -32,128 +44,89 @@ A multi-agent orchestration system where a central router delegates user queries
    │  Agent     │ │  Agent   │ │  Agent   │       each with own prompt
    │  (Maya)    │ │  (Eli)   │ │ (Jordan) │
    └─────┬──────┘ └────┬─────┘ └────┬─────┘
-         └──────────────┼────────────┘
-                        ▼
+         └─────────────┼────────────┘
+                       ▼
               ┌─────────────────┐
               │   Synthesizer   │  ← merges & refines responses
               │                 │     using conversation context
               └────────┬────────┘
                        ▼
               ┌─────────────────┐
-              │  Final Response  │
+              │  Final Response │
               └─────────────────┘
 ```
 
-### Single-Agent Flow
+**<ins>1. Single-agent flow:** User → Orchestrator → Router classifies intent → Specialist Agent responds → Synthesizer refines for conversational coherence (skipped on first turn) → Final Response.
 
-Most queries follow the single-agent path:
-
-1. User sends a message → **Orchestrator** retrieves/creates a session context
-2. **Router Agent** classifies intent into `symptom`, `medication`, `lifestyle`, or `fallback`
-3. The matching **Specialist Agent** generates a response using conversation history
-4. **Response Synthesizer** refines the reply for coherence with prior turns (skipped on first turn — passes through untouched)
-5. Response is returned with agent type, escalation flag, and routing metadata
-
-### Multi-Agent Flow
-
-When a query spans multiple domains (e.g., "I feel sick after taking ibuprofen"), the system fans out to multiple agents:
-
-1. **Router Agent** returns `target_agents: ["symptom", "medication"]` — a list instead of a single agent
-2. **Orchestrator** iterates over the list and calls each specialist agent sequentially, collecting all raw responses
-3. **Synthesizer** receives the list of responses and calls `merge()` instead of `synthesize()`:
-   - Combines all drafts into a single `DRAFT RESPONSES` block (labeled by agent)
-   - Sends them to the LLM along with conversation history
-   - The merged response gets `agent=SYNTHESIZER` to indicate it came from multiple sources
-   - Escalation flag is set if **any** agent flagged it (`any(r.should_escalate for r in responses)`)
-   - Confidence is the **minimum** across all agents (conservative)
-4. If the LLM call fails during merge, the fallback is concatenating all draft texts
-
-```
-Router returns: ["symptom", "medication"]
-                       │
-          ┌────────────┴────────────┐
-          ▼                         ▼
-   SymptomAgent.respond()    MedicationAgent.respond()
-          │                         │
-          └────────────┬────────────┘
-                       ▼
-            Synthesizer.merge([resp1, resp2], context)
-                       │
-                       ▼
-              AgentResponse(agent=SYNTHESIZER, ...)
-```
-
-### Why `merge()` vs `synthesize()`
-
-- `synthesize(raw_response, context)` is a convenience wrapper that calls `merge([raw_response], context)` — so all paths go through the same logic
-- On first turn with a single agent, `merge()` detects no prior context and returns the response untouched (zero LLM cost)
-- On follow-up turns, even single-agent responses get refined for conversational coherence
-- With multiple agents, the synthesizer merges drafts into one coherent response and labels it as `SYNTHESIZER`
+**<ins>2.Multi-agent flow:** When a query spans domains (e.g., "I feel sick after taking ibuprofen"), the Router returns multiple agents → Orchestrator fans out to each → Synthesizer merges drafts into one coherent reply. (*See [merge() vs synthesize()](#why-merge-vs-synthesize) in the appendix for implementation details.*)
 
 ---
 
 ## Key Design Decisions
 
-### Session Isolation
-Each session has its own `ConversationContext` with a sliding window (`max_history=10`) so memory stays bounded. The orchestrator applies an additional trim at `MAX_CONTEXT_MESSAGES=12` as a safety net. Sessions are fully independent — no cross-contamination.
+#### 🛡️ <ins>Safety & Trust
 
-### Safety-First Routing
-The router prompt has an explicit safety override: any mention of emergency symptoms (chest pain, stroke, difficulty breathing) always routes to the symptom agent with high confidence (≥0.9), regardless of other content in the message.
+**1. Safety-First Routing** — The router prompt has an explicit safety override: any mention of emergency symptoms (chest pain, stroke, difficulty breathing) always routes to the symptom agent with high confidence (≥0.9), regardless of other content in the message.
 
-### Deterministic Escalation
-All agents check for emergency keywords client-side using a shared list (`EMERGENCY_KEYWORDS` in `base_agent.py`) rather than relying on the LLM. This guarantees escalation flags are set deterministically across every agent — the LLM cannot "forget" to escalate, and no agent is a safety blind spot.
+**2. Deterministic Escalation** — All agents check for emergency keywords client-side using a shared list (`EMERGENCY_KEYWORDS` in `base_agent.py`) rather than relying on the LLM. This guarantees escalation flags are set deterministically across every agent — the LLM cannot "forget" to escalate, and no agent is a safety blind spot.
 
-### Confidence Gating
-The router returns a confidence score (0.0–1.0). If confidence is below `MIN_CONFIDENCE_THRESHOLD=0.6`, the orchestrator returns a fallback response instead of routing to an agent that might give a poor answer.
+**3. Confidence Gating** — The router returns a confidence score (0.0–1.0). If confidence is below `MIN_CONFIDENCE_THRESHOLD=0.6`, the orchestrator returns a fallback response instead of routing to an agent that might give a poor answer.
 
-### Graceful Degradation
-- Unparseable router JSON → fallback with `confidence=0.0`
-- Agent LLM failure → fallback response
-- Synthesizer LLM failure → concatenated raw drafts (multi-agent) or original response (single-agent)
-- Rate limit (429) → automatic retry with exponential backoff (15s, 30s, 45s)
+#### 🧑‍💻 <ins>User Experience
 
-### Centralized LLM Client
-All LLM calls go through a single `call_llm()` function in `src/llm/client.py`. Retry logic, model configuration, and error handling live in one place — making it easy to swap models, add observability, or adjust retry behavior without touching agent code.
+**1. Session Isolation** — Each session has its own `ConversationContext` with a sliding window (`max_history=10`) so memory stays bounded. Sessions are fully independent — no cross-contamination.
 
-### Agent Registry
-Agents are registered in `src/agents/registry.py` rather than hardcoded in the orchestrator. Adding a new specialist agent requires: (1) a prompt file, (2) a thin agent class, (3) one line in the registry. The orchestrator never needs to change.
+**2. Multi-Agent Synthesis** — When a query spans multiple domains, agents respond concurrently and a synthesizer merges their outputs into one coherent reply. The user sees a single, natural response — not disjointed paragraphs from different agents.
+
+#### ⚡ <ins>Reliability & Performance
+
+**1. Graceful Degradation** — Every failure mode has a defined fallback. Unparseable router JSON returns a fallback with `confidence=0.0`. Agent LLM failures return a safe fallback response. Synthesizer LLM failures fall back to concatenated raw drafts (multi-agent) or the original response (single-agent). Rate limits (429) trigger automatic retry with exponential backoff (15s, 30s, 45s).
+
+**2. First-Turn Passthrough** — On the first turn with a single agent, the synthesizer skips the LLM call entirely and returns the agent's response untouched. This saves latency and cost when synthesis adds no value.
+
+#### 🏗️ <ins>Maintainability & Extensibility
+
+**1. Centralized LLM Client** — All LLM calls go through a single `call_llm()` function in `src/llm/client.py`. Retry logic, model configuration, and error handling live in one place — making it easy to swap models, add observability, or adjust retry behavior without touching agent code.
+
+**2. Agent Registry** — Agents are registered in `src/agents/registry.py` rather than hardcoded in the orchestrator. Adding a new specialist agent requires: (1) a prompt file, (2) a thin agent class, (3) one line in the registry. The orchestrator never needs to change. (See [Project Structure](#project-structure) in the appendix.)
+
+**3. Prompts as Content** — All prompts live in `prompts/` as standalone Markdown files, separate from Python code. This allows non-engineers (e.g. medical reviewers) to read and edit them, keeps version control diffs clean, and opens the door to prompt versioning.
 
 ---
 
 ## Prompt Design Decisions
 
-All prompts live in `prompts/` as Markdown files for readability and version control.
-
-### Router (`prompts/router.md`)
+#### <ins>Router (`prompts/router.md`)
 
 The router is the most critical prompt. Design choices:
 
-- **Strict JSON-only output** — the prompt forbids any explanation text, reducing parse failures. The parser also strips markdown fences (`\`\`\`json`) since LLMs often add them despite instructions
+- **Strict JSON-only output** — the prompt forbids any explanation text, reducing parse failures. The parser also strips markdown fences since LLMs often add them despite instructions
 - **Prioritization rules with examples** — ambiguous queries like "I feel dizzy after taking ibuprofen" are resolved by explicit rules (symptom focus → symptom agent, drug focus → medication agent)
 - **Multi-turn context awareness** — the prompt instructs the router to maintain continuity: vague follow-ups ("is that serious?") route to the same agent as the previous turn
 - **Safety override section** — emergency symptoms always route to symptom regardless of other content, preventing dangerous misrouting
 - **`target_agents` as a list** — enables multi-agent routing. The parser handles both `target_agents` (list) and `target_agent` (string) for robustness
 
-### Symptom Agent (`prompts/symptom.md`)
+#### <ins>Health Care Agents
+##### 1. Symptom Agent (`prompts/symptom.md`)
 
 - **No-diagnosis guardrail** — explicitly forbids naming conditions as causes. Uses phrasing like "this can sometimes be associated with..." instead
 - **Structured response format** — acknowledgement → clarifying questions (max 2–4) → general info → guidance → close. This keeps responses consistent and prevents rambling
 - **Tiered escalation language** — immediate emergency (call 112/911), urgent (see doctor in 24–48h), non-urgent (monitor and follow up)
 - **Domain redirection** — if user asks about medication, the agent redirects to the medication specialist while continuing to address symptoms
 
-### Medication Agent (`prompts/medication.md`)
+##### 2. Medication Agent (`prompts/medication.md`)
 
 - **Safe general guidance allowed** — the prompt explicitly permits widely-accepted advice (e.g., missed dose rules) while forbidding personalized dosing. This avoids the "refuse everything" trap that makes agents unhelpful
 - **High-risk scenario awareness** — pregnancy, elderly, polypharmacy, and organ disease trigger extra caution and referral language
 - **Interaction questions** — handled with general risk info + pharmacist confirmation, never definitive approval
 
-### Lifestyle Agent (`prompts/lifestyle.md`)
+##### 3. Lifestyle Agent (`prompts/lifestyle.md`)
 
 - **Actionability rule** — prefers specific suggestions ("add one serving of vegetables to lunch") over vague advice ("eat healthier")
 - **Behavior change support** — acknowledges that change is hard, encourages small steps, reinforces progress over perfection
 - **Chronic condition safety net** — always recommends coordinating with healthcare provider for users with serious conditions
 
-### Synthesizer (`prompts/synthesizer.md`)
+#### <ins>Synthesizer (`prompts/synthesizer.md`)
 
 - **Minimal intervention** — the prompt instructs the LLM to return the draft unchanged if it's already coherent
 - **No new content rule** — prevents the synthesizer from hallucinating additional medical advice
@@ -163,59 +136,9 @@ The router is the most critical prompt. Design choices:
 
 ---
 
-## Setup Instructions
-
-### Prerequisites
-
-- Python 3.10+
-- A Gemini API key from [Google AI Studio](https://aistudio.google.com/apikey)
-
-### Installation
-
-```bash
-git clone <repo-url>
-cd HealthBot
-
-python3.12 -m venv venv
-source venv/bin/activate  # macOS/Linux
-
-pip install -r requirements.txt
-```
-
-### Configuration
-
-Create a `.env` file in the project root:
-
-```
-GEMINI_API_KEY=your_api_key_here
-```
-
-### Running
-
-**CLI mode:**
-```bash
-python -m src.main ## add -v for verbose logging
-```
-
-**Web UI:**
-```bash
-python web.py
-# Open http://localhost:8000
-```
-
-### Testing
-
-```bash
-pytest tests/ -v
-```
-
-> Note: Tests mock all LLM calls and do not require an API key. If `GEMINI_API_KEY` is not set, pass a dummy value: `GEMINI_API_KEY=x pytest tests/ -v`
-
----
-
 ## Example Conversations
 
-### 1. Symptom Triage — Headache (Single Agent)
+#### 1. <ins>Symptom Triage — Headache (Single Agent)
 
 ```
 User: I've had a headache for two days and it's getting worse.
@@ -240,7 +163,7 @@ In the meantime, staying hydrated and resting in a quiet space may help.
 Let me know more and I can guide you further.
 ```
 
-### 2. Medication Query — Drug Interaction (Single Agent)
+#### <ins>2. Medication Query — Drug Interaction (Single Agent)
 
 ```
 User: Can I take ibuprofen and aspirin together?
@@ -262,63 +185,29 @@ I'd recommend confirming this with your pharmacist or prescribing doctor,
 especially if you take either medication regularly.
 ```
 
-### 3. Multi-Agent — Symptom + Medication Overlap
+#### <ins>3. Multi-Agent — Symptom + Medication Overlap
 
 ```
 User: I feel nauseous and dizzy after taking my new blood pressure medication.
 
 [Router → target_agents: ["symptom", "medication"], confidence: 0.90]
 
-Symptom Agent draft: "Nausea and dizziness can be concerning. How long
-after taking the medication do these symptoms start? Are they getting
-worse over time?"
+[Synthesizer merges both agent drafts]
 
-Medication Agent draft: "Some blood pressure medications can cause
-dizziness or nausea, especially when first starting. This is sometimes
-related to the medication lowering your blood pressure."
+Final Response: I understand that feeling nauseous and dizzy after starting
+a new medication can be quite unsettling. Some blood pressure medications
+can cause these symptoms, especially in the early days as your body adjusts
+to the change in blood pressure levels.
 
-[Synthesizer merges both drafts]
-
-Final Response (agent: SYNTHESIZER): I understand that feeling nauseous
-and dizzy after starting a new medication can be quite unsettling. Some
-blood pressure medications can cause these symptoms, especially in the
-early days as your body adjusts to the change in blood pressure levels.
-
-To help me understand better, could you tell me how long after taking
-the medication these symptoms typically start, and whether they seem to
-be getting worse over time?
+Could you tell me how long after taking the medication these symptoms
+typically start, and whether they seem to be getting worse over time?
 
 If the dizziness is severe or you feel faint, it would be important to
 contact your prescribing doctor soon. They may want to adjust the timing
 or dosage. In the meantime, try standing up slowly and staying hydrated.
 ```
 
-### 4. Lifestyle Guidance — Diabetes Diet (Single Agent)
-
-```
-User: I have type 2 diabetes. What should I eat?
-
-[Router → target_agents: ["lifestyle"], confidence: 0.88]
-
-Lifestyle Agent (Jordan): It's great that you're thinking about how food
-can support your health — diet plays a big role in managing type 2 diabetes.
-
-A few general principles that many people find helpful:
-- Focus on whole, minimally processed foods — vegetables, legumes, whole grains
-- Include protein with each meal to help stabilize blood sugar
-- Limit sugary drinks and refined carbohydrates
-
-A practical starting point: you might try swapping one refined carb
-(white bread, white rice) for a whole grain option this week and see
-how it feels.
-
-Since diabetes management is very individual, it's important to discuss
-any major dietary changes with your doctor or a dietitian who knows your
-full health picture. Would you like more specific ideas around meals or
-snacks?
-```
-
-### 5. Emergency Escalation — Chest Pain
+#### <ins>4. Emergency Escalation — Chest Pain
 
 ```
 User: I'm having chest pain and difficulty breathing.
@@ -336,7 +225,7 @@ If someone is with you, let them know how you're feeling.
 ⚠ ESCALATION: should_escalate=true (deterministic keyword match)
 ```
 
-### 6. Multi-Turn Context — Follow-Up Routing
+#### <ins>5. Multi-Turn Context — Follow-Up Routing
 
 ```
 Turn 1:
@@ -357,25 +246,64 @@ worth paying attention to how you're sleeping. If this continues for
 more than a week, seeing a doctor would be a good next step.
 ```
 
-### 7. Fallback — Off-Topic Query
+---
+
+## Setup Instructions
+
+### Prerequisites
+
+- Python 3.10+
+- A Gemini API key from [Google AI Studio](https://aistudio.google.com/apikey)
+
+### Installation
+
+```bash
+git clone <repo-url>
+cd MamaHealthAgent
+
+python -m venv venv
+source venv/bin/activate  # macOS/Linux
+
+pip install -r requirements.txt
+```
+
+### Configuration
+
+Create a `.env` file in the project root:
 
 ```
-User: What's the weather like today?
-
-[Router → target_agents: ["fallback"], confidence: 0.95]
-
-Fallback: I'm here to help with health-related questions about symptoms,
-medications, and lifestyle. Could you tell me more about what you're
-looking for? If this is a medical emergency, please call your local
-emergency services immediately.
+GEMINI_API_KEY=your_api_key_here
 ```
+
+### Running
+
+**CLI mode:**
+```bash
+python -m src.main
+```
+
+**Web UI:**
+```bash
+python chat_server.py
+# Open http://localhost:8000
+```
+
+### Testing
+
+```bash
+pytest tests/ -v
+```
+
+> Note: Tests mock all LLM calls and do not require an API key. If `GEMINI_API_KEY` is not set, pass a dummy value: `GEMINI_API_KEY=x pytest tests/ -v`. See [Test Coverage Summary](#test-coverage-summary) in the appendix for full breakdown.
 
 ---
 
-## Project Structure
+## Appendix
+
+### Project Structure
 
 ```
-HealthBot/
+MamaHealthAgent/
 ├── src/
 │   ├── agents/
 │   │   ├── base_agent.py       # Abstract base with shared escalation detection
@@ -412,9 +340,7 @@ HealthBot/
 └── README1.md                  # Original challenge brief
 ```
 
----
-
-## Test Coverage Summary
+### Test Coverage Summary
 
 | Module | Tests | What's Covered |
 |--------|-------|----------------|
@@ -425,18 +351,23 @@ HealthBot/
 | Synthesizer | 8 | Refinement, first-turn skip, escalation preservation, LLM error fallback, multi-agent merge |
 | **Total** | **47** | |
 
----
-
-## Optional Features Implemented
+### Optional Features Implemented
 
 - **Multi-Agent Routing** — router can return multiple target agents; orchestrator fans out and synthesizer merges
-- **Guardrails / Escalation** — deterministic keyword-based escalation in the symptom agent, plus prompt-level safety overrides in the router
+- **Guardrails / Escalation** — deterministic keyword-based escalation across all agents, plus prompt-level safety overrides in the router
 - **Response Synthesis** — context-aware refinement layer that ensures multi-turn coherence and multi-agent merge
 - **Multi-Session Support** — the web UI supports multiple concurrent conversations with isolated context
 - **Rate Limit Resilience** — automatic retry with exponential backoff on 429 errors (free-tier Gemini has 5 req/min)
 - **Observability** — structured logging throughout the orchestrator (routing decisions, agent responses, escalation warnings)
 
-## Web UI - How it looks for now
+### Why `merge()` vs `synthesize()`
+
+- `synthesize(raw_response, context)` is a convenience wrapper that calls `merge([raw_response], context)` — so all paths go through the same logic
+- On first turn with a single agent, `merge()` detects no prior context and returns the response untouched (zero LLM cost)
+- On follow-up turns, even single-agent responses get refined for conversational coherence
+- With multiple agents, the synthesizer merges drafts into one coherent response and labels it as `SYNTHESIZER`
+
+### Web UI
 
 <img width="1453" height="788" alt="Screenshot 2026-03-27 at 12 35 48" src="https://github.com/user-attachments/assets/99cb5eb9-9ba8-4a31-8f30-50d80bcadd9b" />
 
