@@ -3,6 +3,10 @@ from pathlib import Path
 
 from src.models.schemas import AgentResponse, AgentType, ConversationContext
 
+EMERGENCY_KEYWORDS = [
+    "chest pain", "can't breathe", "cannot breathe", "difficulty breathing",
+    "stroke", "unconscious", "severe bleeding", "heart attack", "overdose"
+]
 
 class BaseAgent(ABC):
     agent_type: AgentType
@@ -30,3 +34,6 @@ class BaseAgent(ABC):
         self, user_text: str, context: ConversationContext
     ) -> AgentResponse:
         pass
+
+    def _check_escalation(self, user_text: str) -> bool:
+        return any(kw in user_text.lower() for kw in EMERGENCY_KEYWORDS)

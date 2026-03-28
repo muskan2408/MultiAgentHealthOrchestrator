@@ -4,7 +4,8 @@ Run with: pytest tests/test_agents.py -v
 """
 from unittest.mock import patch
 
-from src.agents.symptom_agent import SymptomAgent, ESCALATION_KEYWORDS
+from src.agents.symptom_agent import SymptomAgent
+from src.agents.base_agent import EMERGENCY_KEYWORDS
 from src.agents.medication_agent import MedicationAgent
 from src.agents.lifestyle_agent import LifestyleAgent
 from src.models.schemas import AgentResponse, AgentType, ConversationContext
@@ -40,14 +41,14 @@ class TestSymptomAgent:
         result = agent.respond("I have a mild headache", ctx)
         assert result.should_escalate is False
 
-    def test_escalation_keywords_not_empty(self):
-        assert len(ESCALATION_KEYWORDS) > 0
+    def test_EMERGENCY_KEYWORDS_not_empty(self):
+        assert len(EMERGENCY_KEYWORDS) > 0
 
-    def test_chest_pain_in_escalation_keywords(self):
-        assert "chest pain" in ESCALATION_KEYWORDS
+    def test_chest_pain_in_EMERGENCY_KEYWORDS(self):
+        assert "chest pain" in EMERGENCY_KEYWORDS
 
-    def test_stroke_in_escalation_keywords(self):
-        assert "stroke" in ESCALATION_KEYWORDS
+    def test_stroke_in_EMERGENCY_KEYWORDS(self):
+        assert "stroke" in EMERGENCY_KEYWORDS
 
     @patch("src.llm.client.litellm.completion")
     def test_context_history_passed_to_llm(self, mock_llm):

@@ -15,4 +15,5 @@ class LifestyleAgent(BaseAgent):
         return AgentResponse(
             agent=self.agent_type,
             text=reply,
+            should_escalate=self._check_escalation(user_text),
         )
