@@ -284,7 +284,7 @@ python -m src.main
 
 **Web UI:**
 ```bash
-python chat_server.py
+python web.py
 # Open http://localhost:8000
 ```
 
@@ -305,6 +305,8 @@ pytest tests/ -v
 ```
 MamaHealthAgent/
 ├── src/
+│   ├── config/
+│   │   ├── config.py               # API keys, model name, temperature
 │   ├── agents/
 │   │   ├── base_agent.py       # Abstract base with shared escalation detection
 │   │   ├── router_agent.py     # Intent classification → JSON routing
@@ -319,8 +321,8 @@ MamaHealthAgent/
 │   │   └── client.py           # Thin LiteLLM wrapper — retries, config, single call point
 │   ├── models/
 │   │   └── schemas.py          # Pydantic models (AgentType, Message, etc.)
-│   ├── config.py               # API keys, model name, temperature
 │   └── main.py                 # CLI entry point (--verbose flag for logging)
+│   └── web.py                  # Web entry point
 ├── prompts/
 │   ├── router.md               # Router classification prompt
 │   ├── symptom.md              # Symptom agent system prompt (Maya)
@@ -334,7 +336,6 @@ MamaHealthAgent/
 │   ├── test_orchestrator.py    # End-to-end single & multi-agent flow (11 tests)
 │   ├── test_context.py         # ConversationContext memory tests (8 tests)
 │   └── test_synthesizer.py     # Synthesizer merge + fallback tests (8 tests)
-├── chat_server.py              # Web UI server (HTTP + inline frontend)
 ├── requirements.txt
 ├── README.md                   # This file
 └── README1.md                  # Original challenge brief
