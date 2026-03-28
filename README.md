@@ -193,7 +193,7 @@ python -m src.main # add -v for verbose logging
 
 **Web UI:**
 ```bash
-python chat_server.py
+python web.py
 # Open http://localhost:8000
 ```
 
@@ -396,7 +396,7 @@ HealthBot/
 │   ├── test_orchestrator.py    # End-to-end single & multi-agent flow (11 tests)
 │   ├── test_context.py         # ConversationContext memory tests (8 tests)
 │   └── test_synthesizer.py     # Synthesizer merge + fallback tests (8 tests)
-├── chat_server.py              # Web UI server (HTTP + inline frontend)
+├── web.py              # Web UI server (HTTP + inline frontend)
 ├── requirements.txt
 ├── README.md                   # This file
 └── README1.md                  # Original challenge brief

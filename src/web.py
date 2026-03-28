@@ -1,6 +1,6 @@
 """
 mama health chat server — multi-session
-Run from project root: python chat_server.py
+Run from project root: python web.py
 """
 import json
 import sys
