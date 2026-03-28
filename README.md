@@ -101,7 +101,7 @@ Each session has its own `ConversationContext` with a sliding window (`max_histo
 The router prompt has an explicit safety override: any mention of emergency symptoms (chest pain, stroke, difficulty breathing) always routes to the symptom agent with high confidence (≥0.9), regardless of other content in the message.
 
 ### Deterministic Escalation
-The symptom agent checks for emergency keywords client-side using a hardcoded list (`ESCALATION_KEYWORDS`) rather than relying on the LLM. This guarantees escalation flags are set deterministically — the LLM cannot "forget" to escalate.
+All agents check for emergency keywords client-side using a shared list (`EMERGENCY_KEYWORDS` in `base_agent.py`) rather than relying on the LLM. This guarantees escalation flags are set deterministically across every agent — the LLM cannot "forget" to escalate, and no agent is a safety blind spot.
 
 ### Confidence Gating
 The router returns a confidence score (0.0–1.0). If confidence is below `MIN_CONFIDENCE_THRESHOLD=0.6`, the orchestrator returns a fallback response instead of routing to an agent that might give a poor answer.
@@ -111,6 +111,12 @@ The router returns a confidence score (0.0–1.0). If confidence is below `MIN_C
 - Agent LLM failure → fallback response
 - Synthesizer LLM failure → concatenated raw drafts (multi-agent) or original response (single-agent)
 - Rate limit (429) → automatic retry with exponential backoff (15s, 30s, 45s)
+
+### Centralized LLM Client
+All LLM calls go through a single `call_llm()` function in `src/llm/client.py`. Retry logic, model configuration, and error handling live in one place — making it easy to swap models, add observability, or adjust retry behavior without touching agent code.
+
+### Agent Registry
+Agents are registered in `src/agents/registry.py` rather than hardcoded in the orchestrator. Adding a new specialist agent requires: (1) a prompt file, (2) a thin agent class, (3) one line in the registry. The orchestrator never needs to change.
 
 ---
 
@@ -188,7 +194,7 @@ GEMINI_API_KEY=your_api_key_here
 
 **CLI mode:**
 ```bash
-python -m src.main # add -v for verbose logging
+python -m src.main ## add -v for verbose logging
 ```
 
 **Web UI:**
@@ -372,18 +378,21 @@ emergency services immediately.
 HealthBot/
 ├── src/
 │   ├── agents/
-│   │   ├── base_agent.py       # Abstract base with LLM retry logic
+│   │   ├── base_agent.py       # Abstract base with shared escalation detection
 │   │   ├── router_agent.py     # Intent classification → JSON routing
+│   │   ├── registry.py         # Agent registry — single place to register agents
 │   │   ├── symptom_agent.py    # Symptom triage + escalation detection
 │   │   ├── medication_agent.py # Drug information + safety guidance
 │   │   └── lifestyle_agent.py  # Wellness and habit coaching
 │   ├── orchestrator/
 │   │   ├── orchestrator.py     # Central coordinator + session management
 │   │   └── synthesizer.py      # Context-aware response merge & refinement
+│   ├── llm/
+│   │   └── client.py           # Thin LiteLLM wrapper — retries, config, single call point
 │   ├── models/
 │   │   └── schemas.py          # Pydantic models (AgentType, Message, etc.)
 │   ├── config.py               # API keys, model name, temperature
-│   └── main.py                 # CLI entry point
+│   └── main.py                 # CLI entry point (--verbose flag for logging)
 ├── prompts/
 │   ├── router.md               # Router classification prompt
 │   ├── symptom.md              # Symptom agent system prompt (Maya)
@@ -391,12 +400,13 @@ HealthBot/
 │   ├── lifestyle.md            # Lifestyle agent system prompt (Jordan)
 │   └── synthesizer.md          # Response merge & refinement prompt
 ├── tests/
+│   ├── conftest.py             # Shared fixtures (ctx, make_llm_response)
 │   ├── test_agents.py          # Specialist agent unit tests (12 tests)
 │   ├── test_router.py          # Router parsing + classification (8 tests)
 │   ├── test_orchestrator.py    # End-to-end single & multi-agent flow (11 tests)
 │   ├── test_context.py         # ConversationContext memory tests (8 tests)
 │   └── test_synthesizer.py     # Synthesizer merge + fallback tests (8 tests)
-├── web.py              # Web UI server (HTTP + inline frontend)
+├── chat_server.py              # Web UI server (HTTP + inline frontend)
 ├── requirements.txt
 ├── README.md                   # This file
 └── README1.md                  # Original challenge brief
@@ -431,6 +441,3 @@ HealthBot/
 <img width="1453" height="788" alt="Screenshot 2026-03-27 at 12 35 48" src="https://github.com/user-attachments/assets/99cb5eb9-9ba8-4a31-8f30-50d80bcadd9b" />
 
 <img width="1465" height="760" alt="Screenshot 2026-03-27 at 12 38 14" src="https://github.com/user-attachments/assets/09a91ca4-fe0f-42ab-886f-ed0f8c7352c4" />
-
-
-
