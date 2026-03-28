@@ -1,11 +1,8 @@
 import logging
 from typing import Dict
 
-from src.agents.base_agent import BaseAgent
-from src.agents.lifestyle_agent import LifestyleAgent
-from src.agents.medication_agent import MedicationAgent
+from src.agents.registry import AGENT_REGISTRY
 from src.agents.router_agent import RouterAgent
-from src.agents.symptom_agent import SymptomAgent
 from src.orchestrator.synthesizer import ResponseSynthesizer
 from src.models.schemas import (
     AgentResponse,
@@ -41,13 +38,7 @@ class Orchestrator:
     def __init__(self) -> None:
         self.router = RouterAgent()
         self.synthesizer = ResponseSynthesizer()
-
-        self._agents: Dict[AgentType, BaseAgent] = {
-            AgentType.SYMPTOM: SymptomAgent(),
-            AgentType.MEDICATION: MedicationAgent(),
-            AgentType.LIFESTYLE: LifestyleAgent(),
-        }
-
+        self._agents = AGENT_REGISTRY
         self._contexts: Dict[str, ConversationContext] = {}
 
     # -------------------------
