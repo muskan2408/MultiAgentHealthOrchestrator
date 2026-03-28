@@ -261,7 +261,7 @@ more than a week, seeing a doctor would be a good next step.
 git clone <repo-url>
 cd MamaHealthAgent
 
-python -m venv venv
+python -m venv venv # in case python 3.14.0 is used, please install rust otherwise use 3.12.0
 source venv/bin/activate  # macOS/Linux
 
 pip install -r requirements.txt
