@@ -1,4 +1,5 @@
 from src.agents.base_agent import BaseAgent
+from src.llm.client import call_llm 
 from src.models.schemas import AgentResponse, AgentType, ConversationContext
 
 ESCALATION_KEYWORDS = [
@@ -15,7 +16,7 @@ class SymptomAgent(BaseAgent):
         self, user_text: str, context: ConversationContext
     ) -> AgentResponse:
         messages = self._build_messages(user_text, context)
-        reply = self._call_llm(messages)
+        reply = call_llm(messages)
         should_escalate = any(
             kw in user_text.lower() for kw in ESCALATION_KEYWORDS
         )

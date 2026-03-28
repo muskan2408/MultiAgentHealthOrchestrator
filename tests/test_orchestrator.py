@@ -32,7 +32,7 @@ def _llm_mock(router_json, agent_text, synth_text=None):
 
 class TestOrchestrator:
 
-    @patch("litellm.completion")
+    @patch("src.llm.client.litellm.completion")
     def test_full_flow_symptom(self, mock_llm):
         mock_llm.side_effect = _llm_mock(
             '{"target_agents": ["symptom"], "reasoning": "pain", "confidence": 0.9}',
@@ -43,7 +43,7 @@ class TestOrchestrator:
         assert response.agent == AgentType.SYMPTOM
         assert len(response.text) > 0
 
-    @patch("litellm.completion")
+    @patch("src.llm.client.litellm.completion")
     def test_full_flow_medication(self, mock_llm):
         mock_llm.side_effect = _llm_mock(
             '{"target_agents": ["medication"], "reasoning": "drug", "confidence": 0.9}',
@@ -53,7 +53,7 @@ class TestOrchestrator:
         response = orch.process(UserMessage(text="Tell me about ibuprofen", session_id="s2"))
         assert response.agent == AgentType.MEDICATION
 
-    @patch("litellm.completion")
+    @patch("src.llm.client.litellm.completion")
     def test_fallback_response(self, mock_llm):
         mock_llm.side_effect = _llm_mock(
             '{"target_agents": ["fallback"], "reasoning": "off topic", "confidence": 0.99}',
@@ -64,7 +64,7 @@ class TestOrchestrator:
         assert response.agent == AgentType.FALLBACK
         assert response.text == FALLBACK_RESPONSE
 
-    @patch("litellm.completion")
+    @patch("src.llm.client.litellm.completion")
     def test_context_persists_across_turns(self, mock_llm):
         mock_llm.side_effect = _llm_mock(
             '{"target_agents": ["symptom"], "reasoning": "pain", "confidence": 0.9}',
@@ -77,7 +77,7 @@ class TestOrchestrator:
         ctx = orch._contexts["persist"]
         assert len(ctx.history) == 4  # 2 user + 2 assistant
 
-    @patch("litellm.completion")
+    @patch("src.llm.client.litellm.completion")
     def test_different_sessions_are_isolated(self, mock_llm):
         mock_llm.side_effect = _llm_mock(
             '{"target_agents": ["lifestyle"], "reasoning": "diet", "confidence": 0.85}',
@@ -90,7 +90,7 @@ class TestOrchestrator:
         assert "userB" in orch._contexts
         assert orch._contexts["userA"] is not orch._contexts["userB"]
 
-    @patch("litellm.completion")
+    @patch("src.llm.client.litellm.completion")
     def test_new_session_created_automatically(self, mock_llm):
         mock_llm.side_effect = _llm_mock(
             '{"target_agents": ["lifestyle"], "reasoning": "diet", "confidence": 0.8}',
@@ -115,7 +115,7 @@ class TestOrchestrator:
         assert "a" in sessions
         assert "b" in sessions
 
-    @patch("litellm.completion")
+    @patch("src.llm.client.litellm.completion")
     def test_multi_agent_flow(self, mock_llm):
         mock_llm.side_effect = _llm_mock(
             '{"target_agents": ["symptom", "medication"], "reasoning": "mixed", "confidence": 0.9}',
@@ -127,7 +127,7 @@ class TestOrchestrator:
         assert response.agent == AgentType.SYNTHESIZER
         assert response.text == "Merged response."
 
-    @patch("litellm.completion")
+    @patch("src.llm.client.litellm.completion")
     def test_single_agent_synthesized_on_followup(self, mock_llm):
         """Single agent: first turn passes through, second turn gets refined."""
         mock_llm.side_effect = _llm_mock(
@@ -142,7 +142,7 @@ class TestOrchestrator:
         assert r2.text == "Refined with context."  # second turn — synthesized
         assert r2.agent == AgentType.SYMPTOM  # still single agent type
 
-    @patch("litellm.completion")
+    @patch("src.llm.client.litellm.completion")
     def test_multi_agent_with_context(self, mock_llm):
         """Multi-agent on a follow-up turn uses synthesizer merge."""
         call_count = {"n": 0}

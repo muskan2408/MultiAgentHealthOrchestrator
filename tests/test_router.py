@@ -9,7 +9,7 @@ from src.models.schemas import AgentType, ConversationContext
 
 
 class TestRouterAgent:
-    @patch("src.agents.router_agent.litellm.completion")
+    @patch("src.llm.client.litellm.completion")
     def test_routes_symptom(self, mock_llm):
         mock_llm.return_value = MagicMock(
             choices=[MagicMock(message=MagicMock(content='{"target_agent": "symptom", "reasoning": "physical complaint", "confidence": 0.95}'))]
@@ -20,7 +20,7 @@ class TestRouterAgent:
         assert decision.target_agent == AgentType.SYMPTOM
         assert decision.confidence == 0.95
 
-    @patch("src.agents.router_agent.litellm.completion")
+    @patch("src.llm.client.litellm.completion")
     def test_routes_medication(self, mock_llm):
         mock_llm.return_value = MagicMock(
             choices=[MagicMock(message=MagicMock(content='{"target_agent": "medication", "reasoning": "drug question", "confidence": 0.90}'))]
@@ -30,7 +30,7 @@ class TestRouterAgent:
         decision = router.decide("What are the side effects of ibuprofen?", ctx)
         assert decision.target_agent == AgentType.MEDICATION
 
-    @patch("src.agents.router_agent.litellm.completion")
+    @patch("src.llm.client.litellm.completion")
     def test_routes_lifestyle(self, mock_llm):
         mock_llm.return_value = MagicMock(
             choices=[MagicMock(message=MagicMock(content='{"target_agent": "lifestyle", "reasoning": "diet question", "confidence": 0.88}'))]
@@ -40,7 +40,7 @@ class TestRouterAgent:
         decision = router.decide("What foods help lower blood pressure?", ctx)
         assert decision.target_agent == AgentType.LIFESTYLE
 
-    @patch("src.agents.router_agent.litellm.completion")
+    @patch("src.llm.client.litellm.completion")
     def test_routes_fallback_for_offtopic(self, mock_llm):
         mock_llm.return_value = MagicMock(
             choices=[MagicMock(message=MagicMock(content='{"target_agent": "fallback", "reasoning": "off topic", "confidence": 0.99}'))]
@@ -50,7 +50,7 @@ class TestRouterAgent:
         decision = router.decide("What is the capital of France?", ctx)
         assert decision.target_agent == AgentType.FALLBACK
 
-    @patch("src.agents.router_agent.litellm.completion")
+    @patch("src.llm.client.litellm.completion")
     def test_fallback_on_garbage_response(self, mock_llm):
         mock_llm.return_value = MagicMock(
             choices=[MagicMock(message=MagicMock(content="not json at all !!!"))]
@@ -61,7 +61,7 @@ class TestRouterAgent:
         assert decision.target_agent == AgentType.FALLBACK
         assert decision.confidence == 0.0
 
-    @patch("src.agents.router_agent.litellm.completion")
+    @patch("src.llm.client.litellm.completion")
     def test_strips_markdown_fences(self, mock_llm):
         mock_llm.return_value = MagicMock(
             choices=[MagicMock(message=MagicMock(content='```json\n{"target_agent": "symptom", "reasoning": "test", "confidence": 0.8}\n```'))]
@@ -71,7 +71,7 @@ class TestRouterAgent:
         decision = router.decide("I feel dizzy", ctx)
         assert decision.target_agent == AgentType.SYMPTOM
 
-    @patch("src.agents.router_agent.litellm.completion")
+    @patch("src.llm.client.litellm.completion")
     def test_reasoning_preserved(self, mock_llm):
         mock_llm.return_value = MagicMock(
             choices=[MagicMock(message=MagicMock(content='{"target_agent": "symptom", "reasoning": "user describes pain", "confidence": 0.9}'))]
@@ -81,7 +81,7 @@ class TestRouterAgent:
         decision = router.decide("my back hurts", ctx)
         assert decision.reasoning == "user describes pain"
 
-    @patch("src.agents.router_agent.litellm.completion")
+    @patch("src.llm.client.litellm.completion")
     def test_confidence_clamped_in_model(self, mock_llm):
         mock_llm.return_value = MagicMock(
             choices=[MagicMock(message=MagicMock(content='{"target_agent": "lifestyle", "reasoning": "wellness", "confidence": 0.5}'))]

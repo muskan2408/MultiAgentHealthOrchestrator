@@ -170,7 +170,7 @@ The router is the most critical prompt. Design choices:
 git clone <repo-url>
 cd HealthBot
 
-python -m venv venv
+python3.12 -m venv venv
 source venv/bin/activate  # macOS/Linux
 
 pip install -r requirements.txt
@@ -188,7 +188,7 @@ GEMINI_API_KEY=your_api_key_here
 
 **CLI mode:**
 ```bash
-python -m src.main
+python -m src.main # add -v for verbose logging
 ```
 
 **Web UI:**

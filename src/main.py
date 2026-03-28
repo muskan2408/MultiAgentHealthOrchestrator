@@ -1,8 +1,17 @@
+import argparse
+import logging
 from src.models.schemas import UserMessage
 from src.orchestrator.orchestrator import Orchestrator
 
 
 def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--verbose", "-v", action="store_true")
+    args = parser.parse_args()
+
+    if args.verbose:
+        logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+
     print("\n--- mama health AI assistant ---")
     print("Type your health question and press Enter.")
     print("Type 'quit' to exit.\n")

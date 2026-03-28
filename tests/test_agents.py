@@ -11,7 +11,7 @@ from src.models.schemas import AgentResponse, AgentType, ConversationContext
 
 
 class TestSymptomAgent:
-    @patch("src.agents.base_agent.litellm.completion")
+    @patch("src.llm.client.litellm.completion")
     def test_respond_returns_correct_agent_type(self, mock_llm):
         mock_llm.return_value = MagicMock(
             choices=[MagicMock(message=MagicMock(content="How long have you had the headache?"))]
@@ -21,7 +21,7 @@ class TestSymptomAgent:
         result = agent.respond("I have a headache", ctx)
         assert result.agent == AgentType.SYMPTOM
 
-    @patch("src.agents.base_agent.litellm.completion")
+    @patch("src.llm.client.litellm.completion")
     def test_respond_returns_non_empty_text(self, mock_llm):
         mock_llm.return_value = MagicMock(
             choices=[MagicMock(message=MagicMock(content="Tell me more."))]
@@ -31,7 +31,7 @@ class TestSymptomAgent:
         result = agent.respond("I feel unwell", ctx)
         assert len(result.text) > 0
 
-    @patch("src.agents.base_agent.litellm.completion")
+    @patch("src.llm.client.litellm.completion")
     def test_escalation_flag_on_chest_pain(self, mock_llm):
         mock_llm.return_value = MagicMock(
             choices=[MagicMock(message=MagicMock(content="Please call emergency services."))]
@@ -41,7 +41,7 @@ class TestSymptomAgent:
         result = agent.respond("I have chest pain and can't breathe", ctx)
         assert result.should_escalate is True
 
-    @patch("src.agents.base_agent.litellm.completion")
+    @patch("src.llm.client.litellm.completion")
     def test_no_escalation_for_mild_symptom(self, mock_llm):
         mock_llm.return_value = MagicMock(
             choices=[MagicMock(message=MagicMock(content="How long have you had this?"))]
@@ -60,7 +60,7 @@ class TestSymptomAgent:
     def test_stroke_in_escalation_keywords(self):
         assert "stroke" in ESCALATION_KEYWORDS
 
-    @patch("src.agents.base_agent.litellm.completion")
+    @patch("src.llm.client.litellm.completion")
     def test_context_history_passed_to_llm(self, mock_llm):
         mock_llm.return_value = MagicMock(
             choices=[MagicMock(message=MagicMock(content="I see, tell me more."))]
@@ -77,7 +77,7 @@ class TestSymptomAgent:
 
 
 class TestMedicationAgent:
-    @patch("src.agents.base_agent.litellm.completion")
+    @patch("src.llm.client.litellm.completion")
     def test_respond_returns_correct_agent_type(self, mock_llm):
         mock_llm.return_value = MagicMock(
             choices=[MagicMock(message=MagicMock(content="Ibuprofen can cause stomach upset."))]
@@ -87,7 +87,7 @@ class TestMedicationAgent:
         result = agent.respond("What are the side effects of ibuprofen?", ctx)
         assert result.agent == AgentType.MEDICATION
 
-    @patch("src.agents.base_agent.litellm.completion")
+    @patch("src.llm.client.litellm.completion")
     def test_no_escalation_by_default(self, mock_llm):
         mock_llm.return_value = MagicMock(
             choices=[MagicMock(message=MagicMock(content="Some info."))]
@@ -99,7 +99,7 @@ class TestMedicationAgent:
 
 
 class TestLifestyleAgent:
-    @patch("src.agents.base_agent.litellm.completion")
+    @patch("src.llm.client.litellm.completion")
     def test_respond_returns_correct_agent_type(self, mock_llm):
         mock_llm.return_value = MagicMock(
             choices=[MagicMock(message=MagicMock(content="Reduce sodium intake."))]
@@ -109,7 +109,7 @@ class TestLifestyleAgent:
         result = agent.respond("Foods to avoid with high blood pressure?", ctx)
         assert result.agent == AgentType.LIFESTYLE
 
-    @patch("src.agents.base_agent.litellm.completion")
+    @patch("src.llm.client.litellm.completion")
     def test_respond_returns_non_empty_text(self, mock_llm):
         mock_llm.return_value = MagicMock(
             choices=[MagicMock(message=MagicMock(content="Exercise regularly."))]

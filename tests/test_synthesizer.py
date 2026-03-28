@@ -9,7 +9,7 @@ from src.orchestrator.synthesizer import ResponseSynthesizer
 
 
 class TestResponseSynthesizer:
-    @patch("src.orchestrator.synthesizer.litellm.completion")
+    @patch("src.llm.client.litellm.completion")
     def test_synthesize_refines_text(self, mock_llm):
         mock_llm.return_value = MagicMock(
             choices=[MagicMock(message=MagicMock(content="Refined: drink water and rest."))]
@@ -23,7 +23,7 @@ class TestResponseSynthesizer:
         result = synth.synthesize(raw, ctx)
         assert result.text == "Refined: drink water and rest."
 
-    @patch("src.orchestrator.synthesizer.litellm.completion")
+    @patch("src.llm.client.litellm.completion")
     def test_synthesize_preserves_agent_type(self, mock_llm):
         mock_llm.return_value = MagicMock(
             choices=[MagicMock(message=MagicMock(content="Refined reply."))]
@@ -37,7 +37,7 @@ class TestResponseSynthesizer:
         result = synth.synthesize(raw, ctx)
         assert result.agent == AgentType.MEDICATION
 
-    @patch("src.orchestrator.synthesizer.litellm.completion")
+    @patch("src.llm.client.litellm.completion")
     def test_synthesize_skips_on_first_turn(self, mock_llm):
         synth = ResponseSynthesizer()
         ctx = ConversationContext(session_id="t")
@@ -47,7 +47,7 @@ class TestResponseSynthesizer:
         assert result.text == "Original text."
         mock_llm.assert_not_called()
 
-    @patch("src.orchestrator.synthesizer.litellm.completion")
+    @patch("src.llm.client.litellm.completion")
     def test_synthesize_preserves_escalation_flag(self, mock_llm):
         mock_llm.return_value = MagicMock(
             choices=[MagicMock(message=MagicMock(content="Call emergency services."))]
@@ -61,7 +61,7 @@ class TestResponseSynthesizer:
         result = synth.synthesize(raw, ctx)
         assert result.should_escalate is True
 
-    @patch("src.orchestrator.synthesizer.litellm.completion")
+    @patch("src.llm.client.litellm.completion")
     def test_synthesize_falls_back_on_llm_error(self, mock_llm):
         mock_llm.side_effect = Exception("LLM unavailable")
         synth = ResponseSynthesizer()
@@ -73,7 +73,7 @@ class TestResponseSynthesizer:
         result = synth.synthesize(raw, ctx)
         assert result.text == "Original."
 
-    @patch("src.orchestrator.synthesizer.litellm.completion")
+    @patch("src.llm.client.litellm.completion")
     def test_synthesize_preserves_routed_by(self, mock_llm):
         mock_llm.return_value = MagicMock(
             choices=[MagicMock(message=MagicMock(content="Refined."))]
@@ -87,7 +87,7 @@ class TestResponseSynthesizer:
         result = synth.synthesize(raw, ctx)
         assert result.routed_by == AgentType.ROUTER
 
-    @patch("src.orchestrator.synthesizer.litellm.completion")
+    @patch("src.llm.client.litellm.completion")
     def test_merge_multiple_agents(self, mock_llm):
         mock_llm.return_value = MagicMock(
             choices=[MagicMock(message=MagicMock(content="Merged answer."))]

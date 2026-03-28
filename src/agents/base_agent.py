@@ -1,9 +1,6 @@
 from abc import ABC, abstractmethod
 from pathlib import Path
 
-import litellm
-
-from src.config import MAX_TOKENS, MODEL_NAME, TEMPERATURE
 from src.models.schemas import AgentResponse, AgentType, ConversationContext
 
 
@@ -33,20 +30,3 @@ class BaseAgent(ABC):
         self, user_text: str, context: ConversationContext
     ) -> AgentResponse:
         pass
-
-    def _call_llm(self, messages: list[dict]) -> str:
-        for attempt in range(3):
-            try:
-                response = litellm.completion(
-                    model=MODEL_NAME,
-                    messages=messages,
-                    max_tokens=MAX_TOKENS,
-                    temperature=TEMPERATURE,
-                )
-                return response.choices[0].message.content.strip()
-            except Exception as e:
-                if ("429" in str(e) or "rate" in str(e).lower()) and attempt < 2:
-                    import time
-                    time.sleep(15 * (attempt + 1))
-                else:
-                    raise

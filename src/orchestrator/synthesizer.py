@@ -10,8 +10,7 @@ context, then asks the LLM to produce a final response that:
 """
 from pathlib import Path
 
-import litellm
-from src.config import MAX_TOKENS, MODEL_NAME, TEMPERATURE
+from src.llm.client import call_llm
 from src.models.schemas import AgentResponse, AgentType, ConversationContext
 
 SYNTHESIS_WINDOW = 6  # last N messages to include as context
@@ -80,13 +79,7 @@ class ResponseSynthesizer:
         ]
 
         try:
-            llm_response = litellm.completion(
-                model=MODEL_NAME,
-                messages=messages,
-                max_tokens=MAX_TOKENS,
-                temperature=TEMPERATURE,
-            )
-            refined_text = llm_response.choices[0].message.content.strip()
+            refined_text = call_llm(messages)
         except Exception:
             refined_text = "\n\n".join(r.text for r in responses)
 

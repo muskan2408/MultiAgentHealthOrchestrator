@@ -3,9 +3,7 @@ import logging
 import re
 from pathlib import Path
 
-import litellm
-
-from src.config import MODEL_NAME, TEMPERATURE
+from src.llm.client import call_llm 
 from src.models.schemas import AgentType, ConversationContext, RouterDecision
 
 logger = logging.getLogger(__name__)
@@ -26,23 +24,8 @@ class RouterAgent:
         ]
 
         try:
-            for attempt in range(3):
-                try:
-                    response = litellm.completion(
-                        model=MODEL_NAME,
-                        messages=messages,
-                        max_tokens=256,
-                        temperature=TEMPERATURE,
-                    )
-                    raw = response.choices[0].message.content.strip()
-                    logger.info("Router raw LLM response: %s", raw)
-                    break
-                except Exception as e:
-                    if ("429" in str(e) or "rate" in str(e).lower()) and attempt < 2:
-                        import time
-                        time.sleep(15 * (attempt + 1))
-                    else:
-                        raise
+            raw = call_llm(messages, max_tokens=256)
+            logger.info("Router raw LLM response: %s", raw)
         except Exception as e:
             return RouterDecision(
                 target_agents=[AgentType.FALLBACK],
