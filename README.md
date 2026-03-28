@@ -284,7 +284,7 @@ python -m src.main
 
 **Web UI:**
 ```bash
-python web.py
+python -m src.web
 # Open http://localhost:8000
 ```
 
