@@ -1,4 +1,4 @@
-# mama health — Multi-Agent Health Assistant
+# Multi-Agent Health Assistant
 
 A multi-agent orchestration system where a central router delegates user queries to one or more specialized health agents. Built with `Python`, `LiteLLM (Gemini)`, and `Pydantic`.
 
@@ -259,7 +259,7 @@ more than a week, seeing a doctor would be a good next step.
 
 ```bash
 git clone <repo-url>
-cd MamaHealthAgent
+cd HealthAgent
 
 python -m venv .venv # in case python 3.14.0 is used, please install rust otherwise use 3.12.0
 source venv/bin/activate  # macOS/Linux
@@ -303,7 +303,7 @@ pytest tests/ -v
 ### Project Structure
 
 ```
-MamaHealthAgent/
+HealthAgent/
 ├── src/
 │   ├── config/
 │   │   ├── config.py               # API keys, model name, temperature
