@@ -1,6 +1,6 @@
-# mama health - Full-Stack AI Engineer Challenge
+# Full-Stack AI Engineer Challenge
 
-Welcome, and thank you for your interest in joining mama health! This challenge simulates a real-world task you would encounter as part of our AI team. It will test your ability to design and implement multiagent systems, write effective prompts, and produce clean, maintainable Python code.
+Welcome, and thank you for your interest in joining  health! This challenge simulates a real-world task you would encounter as part of our AI team. It will test your ability to design and implement multiagent systems, write effective prompts, and produce clean, maintainable Python code.
 
 We respect your time and have designed this exercise to be completed in **4-6 hours**. Please don't feel the need to build a perfect, production-ready system. We're most interested in your **prompt engineering skills**, your **architectural thinking around agents**, and how you write **clean, well-structured Python code**.
 
@@ -10,7 +10,7 @@ Good luck!
 
 ## The Business Context
 
-mama health operates conversational AI systems that guide patients through complex healthcare journeys. Our platform relies on multiple specialized AI agents working together—each responsible for a specific domain (e.g., symptom triage, medication guidance, appointment scheduling).
+ health operates conversational AI systems that guide patients through complex healthcare journeys. Our platform relies on multiple specialized AI agents working together—each responsible for a specific domain (e.g., symptom triage, medication guidance, appointment scheduling).
 
 A key challenge we face is **agent orchestration**: ensuring that user queries are routed to the right specialist agent, that agents can hand off to each other gracefully, and that the overall conversation remains coherent and helpful.
 
@@ -122,7 +122,7 @@ please contact your healthcare provider immediately."
 
 ## Deliverables
 
-Please submit a link to your GitHub repository. **Keep the repository private** and send an invite to **johannes.unruh@mamahealth.io** (tj-mm) and **lorenzo.famiglini@mamahealth.io** (lollomamahealth) a short notification email to **mattia.munari@mamahealth.io**.
+Please submit a link to your GitHub repository. **Keep the repository private** and send an invite to **johannes.unruh@health.io** (tj-mm) and **lorenzo.famiglini@health.io** (lollohealth) a short notification email to **mattia.munari@health.io**.
 
 The repository should contain:
 
